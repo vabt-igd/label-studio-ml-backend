@@ -1,3 +1,4 @@
+import logging
 import os
 import string
 from random import SystemRandom
@@ -16,7 +17,9 @@ from label_studio_tools.core.utils.io import get_data_dir
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 
 from label_studio_ml.model import LabelStudioMLBase
-from label_studio_ml.utils import get_image_local_path, logger
+from label_studio_ml.utils import get_image_local_path, DATA_UNDEFINED_NAME
+
+logger = logging.getLogger(__name__)
 
 url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
 request.urlretrieve(url, "sam_vit_b_01ec64.pth")
@@ -135,8 +138,7 @@ class SAMBackend(LabelStudioMLBase):
         }]
 
     def _get_image_url(self, task):
-        data_values = list(task['data'].values())
-        image_url = data_values[0]
+        image_url = task['data'].get(self.value) or task['data'].get(DATA_UNDEFINED_NAME)
         if image_url.startswith('s3://'):
             # presign s3 url
             r = urlparse(image_url, allow_fragments=False)
@@ -149,5 +151,5 @@ class SAMBackend(LabelStudioMLBase):
                     Params={'Bucket': bucket_name, 'Key': key}
                 )
             except ClientError as exc:
-                logger.warning(f'Can\'t generate resigned URL for {image_url}. Reason: {exc}')
+                logger.warning(f'Can\'t generate pre-signed URL for {image_url}. Reason: {exc}')
         return image_url

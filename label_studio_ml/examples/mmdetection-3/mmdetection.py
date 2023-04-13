@@ -84,7 +84,7 @@ class MMDetection(LabelStudioMLBase):
                     Params={'Bucket': bucket_name, 'Key': key}
                 )
             except ClientError as exc:
-                logger.warning(f'Can\'t generate presigned URL for {image_url}. Reason: {exc}')
+                logger.warning(f'Can\'t generate pre-signed URL for {image_url}. Reason: {exc}')
         return image_url
 
     def predict(self, tasks, **kwargs):

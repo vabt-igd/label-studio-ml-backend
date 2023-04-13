@@ -11,5 +11,5 @@ torchvision>=0.14.1
 openmim>=0.3.7
 
 opencv-contrib-python-headless>=4.7.0.72
-# mmcv==2.0.0rc3
-mmdet==3.0.0
+mmcv>=2.0.0
+mmdet>=3.0.0

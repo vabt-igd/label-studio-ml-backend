@@ -38,10 +38,10 @@ class SAMBackend(LabelStudioMLBase):
                      f' - device used:\t{device}{os.linesep}')
 
         # retrieve a checkpoiunt
-        url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"
+        url = "https://dl.fbaipublicfiles.com/segment_anything/" + sam_checkpoint
         request.urlretrieve(url, sam_checkpoint)
 
-        sam = sam_model_registry[model_type](checkpoint=sam_checkpoint, )
+        sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
         sam.to(device=device)
         self.sam_mask_generator = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
 

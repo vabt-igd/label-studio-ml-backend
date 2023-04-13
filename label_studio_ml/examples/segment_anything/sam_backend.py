@@ -2,6 +2,7 @@ import os
 import string
 from random import SystemRandom
 from typing import List, Dict, Any
+from urllib import request
 from urllib.parse import urlparse
 
 import boto3
@@ -28,13 +29,17 @@ class SAMBackend(LabelStudioMLBase):
         self.image_dir = os.path.join(get_data_dir(), 'media', 'upload')
         logger.debug(f'{self.__class__.__name__} reads images from {self.image_dir}')
 
-        sam_checkpoint = "../models/sam_vit_b_01ec64.pth"
+        sam_checkpoint = "sam_vit_b_01ec64.pth"
         model_type = "vit_b"
         device = "cpu"  # "cuda"
         logger.debug(f'Model config:{os.linesep}'
                      f' - checkpoint:\t{sam_checkpoint}{os.linesep}'
                      f' - model type:\t{model_type}{os.linesep}'
                      f' - device used:\t{device}{os.linesep}')
+
+        # retrieve a checkpoiunt
+        url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth"
+        request.urlretrieve(url, sam_checkpoint)
 
         sam = sam_model_registry[model_type](checkpoint=sam_checkpoint, )
         sam.to(device=device)

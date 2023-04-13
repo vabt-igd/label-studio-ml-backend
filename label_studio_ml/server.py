@@ -106,7 +106,8 @@ def create_dir(args):
             raise ValueError(
                 'You don\'t specify target model class, and we\'ve found {num} possible candidates within {script}. '
                 'Please specify explicitly which one should be used using the following format:\n '
-                '{script}:{model_class}'.format(num=len(model_classes), script=script_path, model_class=model_classes[0]))
+                '{script}:{model_class}'.format(num=len(model_classes), script=script_path,
+                                                model_class=model_classes[0]))
         model_class = model_classes[0]
 
     if not os.path.exists(script_path):
@@ -159,7 +160,7 @@ def deploy_to_gcp(args):
     # check if auth token exists
     auth_token = subprocess.check_output(' '.join(["gcloud", "auth", "print-identity-token"]), shell=True)
     if not auth_token:
-        raise PermissionError("You are not authentificated in gcloud! Please run gcloud auth login.")
+        raise PermissionError("You are not authenticated in gcloud! Please run gcloud auth login.")
     # configurate project
     subprocess.check_output(' '.join(["gcloud", "config", "set", "project", project_id]), shell=True)
     # deploy service
@@ -168,7 +169,8 @@ def deploy_to_gcp(args):
         service_name,
         "--source", output_dir,
         "--region", region,
-        "--update-env-vars", f"LABEL_STUDIO_ML_BACKEND_V2=1,LABEL_STUDIO_HOSTNAME={args.label_studio_host},LABEL_STUDIO_API_KEY={args.label_studio_api_key}"
+        "--update-env-vars", f"LABEL_STUDIO_ML_BACKEND_V2=1,LABEL_STUDIO_HOSTNAME={args.label_studio_host},"
+                             f"LABEL_STUDIO_API_KEY={args.label_studio_api_key}"
     ]), input=b"y", shell=True)
 
 
@@ -189,4 +191,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main('init')

@@ -94,7 +94,7 @@ class SAMBackend(LabelStudioMLBase):
                         new_data.append(item)
                 rgbimg.putdata(new_data)
                 # get pixels from image
-                pix = np.array(p_object=rgbimg)
+                pix = np.array(rgbimg)
                 # rgbimg.save("test.png")
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())

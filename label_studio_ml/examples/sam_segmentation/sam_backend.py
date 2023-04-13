@@ -1,3 +1,5 @@
+import io
+import json
 import logging
 import os
 import string
@@ -17,7 +19,7 @@ from label_studio_tools.core.utils.io import get_data_dir
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 
 from label_studio_ml.model import LabelStudioMLBase
-from label_studio_ml.utils import get_image_local_path, DATA_UNDEFINED_NAME
+from label_studio_ml.utils import get_image_local_path, DATA_UNDEFINED_NAME, get_single_tag_keys
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +35,31 @@ class SAMBackend(LabelStudioMLBase):
 
         # default Label Studio image upload folder
         self.image_dir = os.path.join(get_data_dir(), 'media', 'upload')
-        logger.info(f'{self.__class__.__name__} reads images from {self.image_dir}')
+        print(f'{self.__class__.__name__} reads images from {self.image_dir}')
 
         sam_checkpoint = "sam_vit_b_01ec64.pth"
         model_type = "vit_b"
         device = "cpu"  # "cuda"
-        logger.info(f'Model config:{os.linesep}'
-                     f' - checkpoint:\t{sam_checkpoint}{os.linesep}'
-                     f' - model type:\t{model_type}{os.linesep}'
-                     f' - device used:\t{device}{os.linesep}')
+        print(f'Model config:{os.linesep}'
+              f' - checkpoint:\t{sam_checkpoint}{os.linesep}'
+              f' - model type:\t{model_type}{os.linesep}'
+              f' - device used:\t{device}{os.linesep}')
 
         sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
         sam.to(device=device)
         self.sam_mask_generator = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
+        self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(self.parsed_label_config,
+                                                                                              'BrushLabels', 'Image')
+        schema = list(self.parsed_label_config.values())[0]
+        self.labels_in_config = set(self.labels_in_config)
+
+        # Collect label maps from `predicted_values="airplane,car"` attribute in <Label> tag
+        self.label_map = {}
+        self.labels_attrs = schema.get('labels_attrs')
+        if self.labels_attrs:
+            for label_name, label_attrs in self.labels_attrs.items():
+                for predicted_value in label_attrs.get('predicted_values', '').split(','):
+                    self.label_map[predicted_value] = label_name
 
     def predict(self, tasks, **kwargs):
         results = []
@@ -54,9 +68,9 @@ class SAMBackend(LabelStudioMLBase):
         from_name, schema = list(self.parsed_label_config.items())[0]
         to_name = schema['to_name'][0]
 
-        logger.info(f'Tasks to complete: {len(tasks)}')
+        print(f'Tasks to complete: {len(tasks)}')
         for task in tasks:
-            logger.info(f'Current task: {task}')
+            print(f'Current task: {task}')
             labels = []
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
@@ -77,9 +91,9 @@ class SAMBackend(LabelStudioMLBase):
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')
                 all_scores.append(score)
-                logger.info(f'Current mask:{os.linesep}'
-                            f' - bounding box:\t{mask.get("bbox")}'
-                            f' - score:\t\t{score}')
+                print(f'Current mask:{os.linesep}'
+                      f' - bounding box:\t{mask.get("bbox")}'
+                      f' - score:\t\t{score}')
 
                 _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)  # convert result mask to mask
                 result_mask = _result_mask.copy()
@@ -130,7 +144,7 @@ class SAMBackend(LabelStudioMLBase):
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)
 
-        logger.info(f"Segmentation results:{os.linesep}{results}")
+        print(f"Segmentation results:{os.linesep}{results}")
 
         return [{
             'result': results,
@@ -153,3 +167,12 @@ class SAMBackend(LabelStudioMLBase):
             except ClientError as exc:
                 logger.warning(f'Can\'t generate pre-signed URL for {image_url}. Reason: {exc}')
         return image_url
+
+
+def _json_load(file, int_keys=False):
+    with io.open(file, encoding='utf8') as f:
+        data = json.load(f)
+        if int_keys:
+            return {int(k): v for k, v in data.items()}
+        else:
+            return data

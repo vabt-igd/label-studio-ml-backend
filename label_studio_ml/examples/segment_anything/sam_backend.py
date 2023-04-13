@@ -41,7 +41,8 @@ class SAMBackend(LabelStudioMLBase):
         self.sam_mask_generator = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
 
     def predict(self, tasks, **kwargs):
-        predictions = []
+        results = []
+        all_scores = []
         # Get annotation tag first, and extract from_name/to_name keys from the labeling config to make predictions
         from_name, schema = list(self.parsed_label_config.items())[0]
         to_name = schema['to_name'][0]
@@ -67,6 +68,8 @@ class SAMBackend(LabelStudioMLBase):
             masks: List[Dict[str, Any]] = self.sam_mask_generator.generate(image)
             for mask in masks:
                 segmentation = mask.get('segmentation')
+                score = mask.get('stability_score')
+                all_scores.append(score)
 
                 _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)  # convert result mask to mask
                 result_mask = _result_mask.copy()
@@ -92,36 +95,37 @@ class SAMBackend(LabelStudioMLBase):
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())
 
-                # loading context
-                context = kwargs.get('context')
                 # for each task, return classification results in the form of "choices" pre-annotations
-                predictions.append(
-                    [{
-                        'result':
-                            [
-                                {
-                                    "original_width": w,
-                                    "original_height": h,
-                                    "value": {
-                                        "format": "rle",
-                                        "rle": result_mask,
-                                        "brushlabels": labels
-                                    },
-                                    "id": ''.join(
-                                        SystemRandom().choice(string.ascii_uppercase
-                                                              + string.ascii_lowercase
-                                                              + string.digits)
-                                        for _ in
-                                        range(10)),
-                                    "from_name": from_name,
-                                    "to_name": to_name,
-                                    "type": "brushlabels"
-                                },
-                            ]
-                    }]
+                results.append(
+                    [
+                        {
+                            'original_width': w,
+                            'original_height': h,
+                            'value': {
+                                'format': 'rle',
+                                'rle': result_mask,
+                                'brushlabels': labels
+                            },
+                            'id': ''.join(
+                                SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+                                for _ in
+                                range(10)),
+                            'from_name': from_name,
+                            'to_name': to_name,
+                            'type': 'brushlabels',
+                            'score': score
+                        },
+                    ]
                 )
 
-        return predictions
+        avg_score = sum(all_scores) / max(len(all_scores), 1)
+
+        logger.debug(f"Segmentation results:{os.linesep}{results}")
+
+        return [{
+            'result': results,
+            'score': avg_score
+        }]
 
     def _get_image_url(self, task):
         data_values = list(task['data'].values())

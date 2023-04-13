@@ -18,6 +18,9 @@ from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.utils import get_image_local_path, logger
 
+url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+request.urlretrieve(url, "sam_vit_b_01ec64.pth")
+
 
 class SAMBackend(LabelStudioMLBase):
 
@@ -36,10 +39,6 @@ class SAMBackend(LabelStudioMLBase):
                      f' - checkpoint:\t{sam_checkpoint}{os.linesep}'
                      f' - model type:\t{model_type}{os.linesep}'
                      f' - device used:\t{device}{os.linesep}')
-
-        # retrieve a checkpoiunt
-        url = "https://dl.fbaipublicfiles.com/segment_anything/" + sam_checkpoint
-        request.urlretrieve(url, sam_checkpoint)
 
         sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
         sam.to(device=device)

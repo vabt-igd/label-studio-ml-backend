@@ -9,6 +9,7 @@ from urllib import request
 from urllib.parse import urlparse
 
 import boto3
+import torch
 from botocore.exceptions import ClientError
 import cv2
 import numpy as np
@@ -34,7 +35,7 @@ class SAMBackend(LabelStudioMLBase):
                  checkpoint_file: Union[str, None] = "sam_vit_b_01ec64.pth",
                  image_dir: Union[str, None] = None,
                  score_threshold=0.5,
-                 device='cpu',  # "cuda"
+                 # device='cpu',  # "cuda"
                  **kwargs):
         """
         Load Segment Anything model for interactive segmentation from checkpoint.
@@ -52,7 +53,15 @@ class SAMBackend(LabelStudioMLBase):
         self.checkpoint_file = checkpoint_file
         model_type = "vit_b"
         self.score_thresh = score_threshold
-        self.device = device
+
+        if torch.cuda.is_available():
+            device_idx = torch.cuda.current_device()
+            self.device = 'cuda:' + str(device_idx)
+            print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}')
+        else:
+            self.device = 'cpu'
+            print('Inference using the CPU')
+            print('NOTE: This may be to slow for label studio to work reliably!')
 
         # default Label Studio image upload folder
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
@@ -64,7 +73,7 @@ class SAMBackend(LabelStudioMLBase):
               f' - device used:\t{self.device}{os.linesep}')
 
         sam = sam_model_registry[model_type](checkpoint=checkpoint_file)
-        sam.to(device=device)
+        sam.to(device=self.device)
         self.model = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
 
     def predict(self, tasks, **kwargs):

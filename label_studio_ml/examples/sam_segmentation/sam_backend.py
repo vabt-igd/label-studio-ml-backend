@@ -4,7 +4,7 @@ import logging
 import os
 import string
 from random import SystemRandom
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from urllib import request
 from urllib.parse import urlparse
 
@@ -29,37 +29,42 @@ request.urlretrieve(url, "sam_vit_b_01ec64.pth")
 
 class SAMBackend(LabelStudioMLBase):
 
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 checkpoint_file: Union[str, None] = "sam_vit_b_01ec64.pth",
+                 image_dir: Union[str, None] = None,
+                 score_threshold=0.5,
+                 device='cpu',  # "cuda"
+                 **kwargs):
+        """
+        Load Segment Anything model for interactive segmentation from checkpoint.
+
+        :param checkpoint_file: Absolute path to the SAM checkpoint
+        :param image_dir: Directory where images are stored (should be used only in case you use direct file upload into Label Studio instead of URLs)
+        :param score_threshold: score threshold to wipe out noisy results
+        :param device: device (cpu, cuda:0, cuda:1, ...)
+        :param kwargs:
+        """
+
         # don't forget to initialize base class...
         super(SAMBackend, self).__init__(**kwargs)
 
-        # default Label Studio image upload folder
-        self.image_dir = os.path.join(get_data_dir(), 'media', 'upload')
-        print(f'{self.__class__.__name__} reads images from {self.image_dir}')
-
-        sam_checkpoint = "sam_vit_b_01ec64.pth"
+        self.checkpoint_file = checkpoint_file
         model_type = "vit_b"
-        device = "cpu"  # "cuda"
+        self.score_thresh = score_threshold
+        self.device = device
+
+        # default Label Studio image upload folder
+        upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
+        self.image_dir = image_dir or upload_dir
+        print(f'{self.__class__.__name__} reads images from {self.image_dir}')
         print(f'Model config:{os.linesep}'
-              f' - checkpoint:\t{sam_checkpoint}{os.linesep}'
+              f' - checkpoint:\t{checkpoint_file}{os.linesep}'
               f' - model type:\t{model_type}{os.linesep}'
-              f' - device used:\t{device}{os.linesep}')
+              f' - device used:\t{self.device}{os.linesep}')
 
-        sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
+        sam = sam_model_registry[model_type](checkpoint=checkpoint_file)
         sam.to(device=device)
-        self.sam_mask_generator = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
-        self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(self.parsed_label_config,
-                                                                                              'BrushLabels', 'Image')
-        schema = list(self.parsed_label_config.values())[0]
-        self.labels_in_config = set(self.labels_in_config)
-
-        # Collect label maps from `predicted_values="airplane,car"` attribute in <Label> tag
-        self.label_map = {}
-        self.labels_attrs = schema.get('labels_attrs')
-        if self.labels_attrs:
-            for label_name, label_attrs in self.labels_attrs.items():
-                for predicted_value in label_attrs.get('predicted_values', '').split(','):
-                    self.label_map[predicted_value] = label_name
+        self.model = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
 
     def predict(self, tasks, **kwargs):
         results = []
@@ -86,7 +91,7 @@ class SAMBackend(LabelStudioMLBase):
             h, w, c = image.shape
 
             # generate masks
-            masks: List[Dict[str, Any]] = self.sam_mask_generator.generate(image)
+            masks: List[Dict[str, Any]] = self.model.generate(image)
             for mask in masks:
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')

@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
 request.urlretrieve(url, "sam_vit_b_01ec64.pth")
 
+DEBUG_IMAGE_PATH_SEG_OUT = os.path.join("images", "in_raw")
+DEBUG_IMAGE_PATH_IN = os.path.join("images", "seg_results")
+
 
 class SAMBackend(LabelStudioMLBase):
 
@@ -36,6 +39,7 @@ class SAMBackend(LabelStudioMLBase):
                  image_dir: Union[str, None] = None,
                  score_threshold=0.5,
                  # device='cpu',  # "cuda"
+                 debug_segmentation_output=False,
                  **kwargs):
         """
         Load Segment Anything model for interactive segmentation from checkpoint.
@@ -53,20 +57,28 @@ class SAMBackend(LabelStudioMLBase):
         self.checkpoint_file = checkpoint_file
         model_type = "vit_b"
         self.score_thresh = score_threshold
+        self.debug_segmentation_output = debug_segmentation_output
+
+        if self.debug_segmentation_output:
+            if not os.path.exists(DEBUG_IMAGE_PATH_SEG_OUT):
+                os.makedirs(DEBUG_IMAGE_PATH_SEG_OUT)
+
+            if not os.path.exists(DEBUG_IMAGE_PATH_IN):
+                os.makedirs(DEBUG_IMAGE_PATH_IN)
 
         if torch.cuda.is_available():
             device_idx = torch.cuda.current_device()
             self.device = 'cuda:' + str(device_idx)
-            print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}')
+            print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}{os.linesep}')
         else:
             self.device = 'cpu'
             print('Inference using the CPU')
-            print('NOTE: This may be to slow for label studio to work reliably!')
+            print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
 
         # default Label Studio image upload folder
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
         self.image_dir = image_dir or upload_dir
-        print(f'{self.__class__.__name__} reads images from {self.image_dir}')
+        print(f'{self.__class__.__name__} reads images from {self.image_dir}{os.linesep}')
         print(f'Model config:{os.linesep}'
               f' - checkpoint:\t{checkpoint_file}{os.linesep}'
               f' - model type:\t{model_type}{os.linesep}'
@@ -83,23 +95,31 @@ class SAMBackend(LabelStudioMLBase):
         from_name, schema = list(self.parsed_label_config.items())[0]
         to_name = schema['to_name'][0]
 
-        print(f'Tasks to complete: {len(tasks)}')
+        print(f'Tasks to complete: {len(tasks)}{os.linesep}')
         for task in tqdm(tasks):
-            print(f'Current task: {task}')
+            print(f'Current task: {task}{os.linesep}')
             labels = ["segment"]
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
-            cv2.imwrite("org_image.jpg", image)
-            _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)
-
             h, w, c = image.shape
+
+            # save the image for debug purposes
+            if self.debug_segmentation_output:
+                temp_id = ''.join(SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+                                  for _ in
+                                  range(10))
+                cv2.imwrite(os.path.join("images", "in_raw", f"input_image_{temp_id}.png"),
+                            cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
             # generate masks
             masks: List[Dict[str, Any]] = self.model.generate(image)
             for mask in tqdm(masks):
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')
+                mask_id = ''.join(SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+                                  for _ in
+                                  range(10))
                 all_scores.append(score)
                 print(f'Current mask:{os.linesep}'
                       f' - bounding box:\t{mask.get("bbox")}{os.linesep}'
@@ -125,7 +145,8 @@ class SAMBackend(LabelStudioMLBase):
                 rgbimg.putdata(new_data)
                 # get pixels from image
                 pix = np.array(rgbimg)
-                rgbimg.save("masked_image.png")
+                if self.debug_segmentation_output:
+                    rgbimg.save(os.path.join("images", "seg_results", f"masked_image_{mask_id}.png"))
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())
 
@@ -141,10 +162,7 @@ class SAMBackend(LabelStudioMLBase):
                                 'rle': result_mask,
                                 'brushlabels': labels
                             },
-                            'id': ''.join(
-                                SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
-                                for _ in
-                                range(10)),
+                            'id': mask_id,
                             'from_name': from_name,
                             'to_name': to_name,
                             'type': 'brushlabels',
@@ -155,7 +173,7 @@ class SAMBackend(LabelStudioMLBase):
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)
 
-        print(f"Segmentation results:{os.linesep}{results}")
+        print(f"Segmentation results:{os.linesep}{results}{os.linesep}")
 
         return [{
             'result': results,

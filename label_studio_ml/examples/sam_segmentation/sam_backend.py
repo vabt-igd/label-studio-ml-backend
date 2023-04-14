@@ -17,6 +17,7 @@ from PIL import Image
 from label_studio_converter.brush import encode_rle
 from label_studio_tools.core.utils.io import get_data_dir
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+from tqdm import tqdm
 
 from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.utils import get_image_local_path, DATA_UNDEFINED_NAME, get_single_tag_keys
@@ -74,12 +75,13 @@ class SAMBackend(LabelStudioMLBase):
         to_name = schema['to_name'][0]
 
         print(f'Tasks to complete: {len(tasks)}')
-        for task in tasks:
+        for task in tqdm(tasks):
             print(f'Current task: {task}')
             labels = []
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+            cv2.imwrite("org_image.jpg", image)
             _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)
 
             # loading context
@@ -92,17 +94,17 @@ class SAMBackend(LabelStudioMLBase):
 
             # generate masks
             masks: List[Dict[str, Any]] = self.model.generate(image)
-            for mask in masks:
+            for mask in tqdm(masks):
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')
                 all_scores.append(score)
                 print(f'Current mask:{os.linesep}'
-                      f' - bounding box:\t{mask.get("bbox")}'
-                      f' - score:\t\t{score}')
+                      f' - bounding box:\t{mask.get("bbox")}{os.linesep}'
+                      f' - score:\t\t{score}{os.linesep}')
 
                 _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)  # convert result mask to mask
                 result_mask = _result_mask.copy()
-                result_mask[segmentation > 0.5] = 255
+                result_mask[segmentation > 0] = 255
                 result_mask = result_mask.astype(np.uint8)
                 # convert mask to RGBA image
                 got_image = Image.fromarray(result_mask)
@@ -120,7 +122,7 @@ class SAMBackend(LabelStudioMLBase):
                 rgbimg.putdata(new_data)
                 # get pixels from image
                 pix = np.array(rgbimg)
-                # rgbimg.save("test.png")
+                rgbimg.save("masked_image.png")
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())
 
@@ -130,6 +132,7 @@ class SAMBackend(LabelStudioMLBase):
                         {
                             'original_width': w,
                             'original_height': h,
+                            'image_rotation': 0,
                             'value': {
                                 'format': 'rle',
                                 'rle': result_mask,

@@ -21,7 +21,7 @@ from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 from tqdm import tqdm
 
 from label_studio_ml.model import LabelStudioMLBase
-from label_studio_ml.utils import get_image_local_path, DATA_UNDEFINED_NAME, get_single_tag_keys
+from label_studio_ml.utils import get_image_local_path
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +117,6 @@ class SAMBackend(LabelStudioMLBase):
             for mask in tqdm(masks):
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')
-                mask_id = ''.join(SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
-                                  for _ in
-                                  range(10))
                 all_scores.append(score)
                 print(f'Current mask:{os.linesep}'
                       f' - bounding box:\t{mask.get("bbox")}{os.linesep}'
@@ -146,29 +143,28 @@ class SAMBackend(LabelStudioMLBase):
                 # get pixels from image
                 pix = np.array(rgbimg)
                 if self.debug_segmentation_output:
+                    mask_id = ''.join(SystemRandom().choice(string.ascii_uppercase
+                                                            + string.ascii_lowercase
+                                                            + string.digits)
+                                      for _ in
+                                      range(10))
                     rgbimg.save(os.path.join("images", "seg_results", f"masked_image_{mask_id}.png"))
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())
 
                 # for each task, return classification results in the form of "choices" pre-annotations
                 results.append(
-                    [
-                        {
-                            'original_width': w,
-                            'original_height': h,
-                            'image_rotation': 0,
-                            'value': {
-                                'format': 'rle',
-                                'rle': result_mask,
-                                'brushlabels': labels
-                            },
-                            'id': mask_id,
-                            'from_name': from_name,
-                            'to_name': to_name,
-                            'type': 'brushlabels',
-                            'score': score
+                    {
+                        'from_name': from_name,
+                        'to_name': to_name,
+                        'type': 'brushlabels',
+                        'value': {
+                            'format': 'rle',
+                            'rle': result_mask,
+                            'brushlabels': labels
                         },
-                    ]
+                        'score': score
+                    },
                 )
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)

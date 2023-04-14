@@ -8,8 +8,7 @@ from mmdet.apis import init_detector, inference_detector
 from mmdet.utils import register_all_modules
 
 from label_studio_ml.model import LabelStudioMLBase
-from label_studio_ml.utils import get_image_size, \
-    get_single_tag_keys, DATA_UNDEFINED_NAME
+from label_studio_ml.utils import get_image_size
 from label_studio_tools.core.utils.io import get_data_dir
 from botocore.exceptions import ClientError
 from urllib.parse import urlparse
@@ -38,6 +37,7 @@ class MMDetection(LabelStudioMLBase):
         :param device: device (cpu, cuda:0, cuda:1, ...)
         :param kwargs:
         """
+
         super(MMDetection, self).__init__(**kwargs)
         config_file = config_file or os.environ['config_file']
         checkpoint_file = checkpoint_file or os.environ['checkpoint_file']
@@ -48,30 +48,13 @@ class MMDetection(LabelStudioMLBase):
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
         self.image_dir = image_dir or upload_dir
         logger.debug(f'{self.__class__.__name__} reads images from {self.image_dir}')
-        if self.labels_file and os.path.exists(self.labels_file):
-            self.label_map = json_load(self.labels_file)
-        else:
-            self.label_map = {}
-
-        self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(
-            self.parsed_label_config, 'RectangleLabels', 'Image')
-        schema = list(self.parsed_label_config.values())[0]
-        self.labels_in_config = set(self.labels_in_config)
-
-        # Collect label maps from `predicted_values="airplane,car"` attribute in <Label> tag
-        self.labels_attrs = schema.get('labels_attrs')
-        if self.labels_attrs:
-            for label_name, label_attrs in self.labels_attrs.items():
-                for predicted_value in label_attrs.get('predicted_values', '').split(','):
-                    self.label_map[predicted_value] = label_name
 
         print('Load new model from: ', config_file, checkpoint_file)
         self.model = init_detector(config_file, checkpoint_file, device=device)
         self.score_thresh = score_threshold
 
-
     def _get_image_url(self, task):
-        image_url = task['data'].get(self.value) or task['data'].get(DATA_UNDEFINED_NAME)
+        image_url = list(task['data'].values())[0]
         if image_url.startswith('s3://'):
             # presign s3 url
             r = urlparse(image_url, allow_fragments=False)
@@ -88,55 +71,61 @@ class MMDetection(LabelStudioMLBase):
         return image_url
 
     def predict(self, tasks, **kwargs):
-        assert len(tasks) == 1
-        task = tasks[0]
-        image_url = self._get_image_url(task)
-        image_path = self.get_local_path(image_url)
-        model_results = inference_detector(self.model, image_path).pred_instances
-        results = []
         all_scores = []
-        img_width, img_height = get_image_size(image_path)
-        print(f">>> model_results: {model_results}")
-        print(f">>> label_map {self.label_map}")
-        print(f">>> self.model.dataset_meta: {self.model.dataset_meta}")
+        results = []
+        from_name, schema = list(self.parsed_label_config.items())[0]
+        to_name = schema['to_name'][0]
         classes = self.model.dataset_meta.get('classes')
-        print(f"Classes >>> {classes}")
-        for item in model_results:
-            print(f"item >>>>> {item}")
-            bboxes, label, scores = item['bboxes'], item['labels'], item['scores']
-            score = float(scores[-1])
-            if score < self.score_thresh:
-                continue
-            print(f"bboxes >>>>> {bboxes}")
-            print(f"label >>>>> {label}")
-            output_label = classes[list(self.label_map.get(label, label))[0]]
-            print(f">>> output_label: {output_label}")
-            if output_label not in self.labels_in_config:
-                print(output_label + ' label not found in project config.')
-                continue
+        print(f"New prediction request!{os.linesep}")
+        print(f"Model recognizes the following classes:{os.linesep}{classes}{os.linesep}")
+        print(f'Tasks to complete: {len(tasks)}{os.linesep}')
 
-            for bbox in bboxes:
-                bbox = list(bbox)
-                if not bbox:
+        for task in tasks:
+            image_url = self._get_image_url(task)
+            image_path = self.get_local_path(image_url)
+            model_results = inference_detector(self.model, image_path).pred_instances
+            img_width, img_height = get_image_size(image_path)
+            print(f"Model predicted {len(model_results)} labels.{os.linesep}")
+
+            for item in model_results:
+                bboxes, label, scores = item['bboxes'], item['labels'], item['scores']
+                output_label = classes[label]
+                score = float(scores[-1])
+                if score < self.score_thresh:
+                    print(f"Prediction [{label}] : {output_label}{os.linesep} not accepted. "
+                          f"Score too low: {score} < {self.score_thresh} (threshold)")
                     continue
 
-                x, y, xmax, ymax = bbox[:4]
-                results.append({
-                    'from_name': self.from_name,
-                    'to_name': self.to_name,
-                    'type': 'rectanglelabels',
-                    'value': {
-                        'rectanglelabels': [output_label],
-                        'x': float(x) / img_width * 100,
-                        'y': float(y) / img_height * 100,
-                        'width': (float(xmax) - float(x)) / img_width * 100,
-                        'height': (float(ymax) - float(y)) / img_height * 100
-                    },
-                    'score': score
-                })
-                all_scores.append(score)
+                for bbox in bboxes:
+                    bbox = list(bbox)
+                    if not bbox:
+                        continue
+
+                    print(f"Prediction accepted:{os.linesep}"
+                          f"- label:\t{output_label}{os.linesep}",
+                          f"- bbox:\t{bbox}{os.linesep}",
+                          f"- score:\t{score}{os.linesep}")
+
+                    x, y, xmax, ymax = bbox[:4]
+                    results.append(
+                        {
+                            'from_name': from_name,
+                            'to_name': to_name,
+                            'type': 'rectanglelabels',
+                            'value': {
+                                'rectanglelabels': [output_label],
+                                'x': float(x) / img_width * 100,
+                                'y': float(y) / img_height * 100,
+                                'width': (float(xmax) - float(x)) / img_width * 100,
+                                'height': (float(ymax) - float(y)) / img_height * 100
+                            },
+                            'score': score
+                        }
+                    )
+                    all_scores.append(score)
+
         avg_score = sum(all_scores) / max(len(all_scores), 1)
-        print(f">>> RESULTS: {results}")
+        print(f"Classification results:{os.linesep}{results}{os.linesep}")
         return [{
             'result': results,
             'score': avg_score

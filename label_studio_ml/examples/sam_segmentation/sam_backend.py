@@ -77,18 +77,12 @@ class SAMBackend(LabelStudioMLBase):
         print(f'Tasks to complete: {len(tasks)}')
         for task in tqdm(tasks):
             print(f'Current task: {task}')
-            labels = []
+            labels = ["segment"]
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
             cv2.imwrite("org_image.jpg", image)
             _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)
-
-            # loading context
-            context = kwargs.get('context')
-            clicks = context.get('result', [])
-            for cl in clicks:
-                labels.extend(cl.get('brushlabels', []))
 
             h, w, c = image.shape
 

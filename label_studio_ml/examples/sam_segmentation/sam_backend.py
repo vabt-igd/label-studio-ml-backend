@@ -157,7 +157,7 @@ class SAMBackend(LabelStudioMLBase):
         }]
 
     def _get_image_url(self, task):
-        image_url = task['data'].get(self.value) or task['data'].get(DATA_UNDEFINED_NAME)
+        image_url = list(task['data'].values())[0]
         if image_url.startswith('s3://'):
             # presign s3 url
             r = urlparse(image_url, allow_fragments=False)

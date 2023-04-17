@@ -96,7 +96,10 @@ class MMDetection(LabelStudioMLBase):
                 score = float(scores[-1])
                 label_id = ''.join(SystemRandom().choice(string.ascii_uppercase
                                                          + string.ascii_lowercase
-                                                         + string.digits))
+                                                         + string.digits)
+                                   for _ in
+                                   range(10))
+
                 if score < self.score_thresh:
                     print(f'Prediction [{label}] : {output_label}{os.linesep} not accepted. '
                           f'Score too low: {score} < {self.score_thresh} (threshold)')

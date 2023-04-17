@@ -122,7 +122,7 @@ class MMDetection(LabelStudioMLBase):
                             'from_name': from_name,
                             'to_name': to_name,
                             'type': 'rectanglelabels',
-                            'id': label_id,
+                            # 'id': label_id,
                             'value': {
                                 'rectanglelabels': [''.join(output_label)],
                                 'x': float(x) / img_width * 100,

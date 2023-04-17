@@ -159,7 +159,7 @@ class SAMBackend(LabelStudioMLBase):
                         'from_name': from_name,
                         'to_name': to_name,
                         'type': 'brushlabels',
-                        'id': mask_id,
+                        # 'id': mask_id,
                         'value': {
                             'format': 'rle',
                             'rle': result_mask,

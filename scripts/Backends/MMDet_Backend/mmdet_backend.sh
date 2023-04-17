@@ -28,10 +28,7 @@ Installing backend depedencies...
  "
 pip install -r $BACKEND_CODE_PATH/requirements.txt
 mim install mmengine
-mim download mmdet --config yolov3_mobilenetv2_8xb24-320-300e_coco --dest $BACKEND_CODE_PATH/
 mim install mmcv==2.0.0
-export checkpoint_file=$BACKEND_CODE_PATH/yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth
-export config_file=$BACKEND_CODE_PATH/yolov3_mobilenetv2_8xb24-320-300e_coco.py
 
 
 echo " 
@@ -40,6 +37,9 @@ Initializing backend...
  "
 rm -rf $BACKEND_BUILD_PATH
 label-studio-ml init $BACKEND_BUILD_PATH --script $BACKEND_CODE_PATH/$BACKEND_SCRIPT
+mim download mmdet --config yolov3_mobilenetv2_8xb24-320-300e_coco --dest $BACKEND_BUILD_PATH/
+export checkpoint_file=./yolov3_mobilenetv2_320_300e_coco_20210719_215349-d18dff72.pth
+export config_file=./yolov3_mobilenetv2_8xb24-320-300e_coco.py
 
 
 echo " 

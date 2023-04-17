@@ -117,10 +117,17 @@ class SAMBackend(LabelStudioMLBase):
             for mask in tqdm(masks):
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')
+                mask_id = ''.join(SystemRandom().choice(string.ascii_uppercase
+                                                        + string.ascii_lowercase
+                                                        + string.digits)
+                                  for _ in
+                                  range(10))
+
                 all_scores.append(score)
                 print(f'Current mask:{os.linesep}'
                       f' - bounding box:\t{mask.get("bbox")}{os.linesep}'
-                      f' - score:\t\t{score}{os.linesep}')
+                      f' - score:\t\t{score}{os.linesep}'
+                      f' - random id:\t\t{mask_id}{os.linesep}')
 
                 _result_mask = np.zeros(image.shape[:2], dtype=np.uint16)  # convert result mask to mask
                 result_mask = _result_mask.copy()
@@ -143,11 +150,6 @@ class SAMBackend(LabelStudioMLBase):
                 # get pixels from image
                 pix = np.array(rgbimg)
                 if self.debug_segmentation_output:
-                    mask_id = ''.join(SystemRandom().choice(string.ascii_uppercase
-                                                            + string.ascii_lowercase
-                                                            + string.digits)
-                                      for _ in
-                                      range(10))
                     rgbimg.save(os.path.join("images", "seg_results", f"masked_image_{mask_id}.png"))
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())
@@ -158,6 +160,7 @@ class SAMBackend(LabelStudioMLBase):
                         'from_name': from_name,
                         'to_name': to_name,
                         'type': 'brushlabels',
+                        'id': mask_id,
                         'value': {
                             'format': 'rle',
                             'rle': result_mask,

@@ -1,5 +1,8 @@
 import os
 import logging
+import string
+from random import SystemRandom
+
 import boto3
 import io
 import json
@@ -91,6 +94,9 @@ class MMDetection(LabelStudioMLBase):
                 bboxes, label, scores = item['bboxes'], item['labels'], item['scores']
                 output_label = classes[label]
                 score = float(scores[-1])
+                label_id = ''.join(SystemRandom().choice(string.ascii_uppercase
+                                                         + string.ascii_lowercase
+                                                         + string.digits))
                 if score < self.score_thresh:
                     print(f"Prediction [{label}] : {output_label}{os.linesep} not accepted. "
                           f"Score too low: {score} < {self.score_thresh} (threshold)")
@@ -102,9 +108,10 @@ class MMDetection(LabelStudioMLBase):
                         continue
 
                     print(f"Prediction accepted:{os.linesep}"
-                          f"- label:\t{output_label}{os.linesep}",
-                          f"- bbox:\t{bbox}{os.linesep}",
-                          f"- score:\t{score}{os.linesep}")
+                          f" - label:\t{output_label}{os.linesep}",
+                          f" - bbox:\t{bbox}{os.linesep}",
+                          f" - score:\t{score}{os.linesep}"
+                          f' - random id:\t\t{label_id}{os.linesep}')
 
                     x, y, xmax, ymax = bbox[:4]
                     results.append(
@@ -112,6 +119,7 @@ class MMDetection(LabelStudioMLBase):
                             'from_name': from_name,
                             'to_name': to_name,
                             'type': 'rectanglelabels',
+                            'id': label_id,
                             'value': {
                                 'rectanglelabels': [output_label],
                                 'x': float(x) / img_width * 100,

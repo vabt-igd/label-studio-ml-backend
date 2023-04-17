@@ -98,7 +98,6 @@ class SAMBackend(LabelStudioMLBase):
         print(f'Tasks to complete: {len(tasks)}{os.linesep}')
         for task in tqdm(tasks):
             print(f'Current task: {task}{os.linesep}')
-            labels = ["segment"]
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
@@ -164,7 +163,7 @@ class SAMBackend(LabelStudioMLBase):
                         'value': {
                             'format': 'rle',
                             'rle': result_mask,
-                            'brushlabels': labels
+                            'brushlabels': ["segment_" + mask_id]
                         },
                         'score': score
                     },

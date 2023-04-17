@@ -6,6 +6,7 @@ boto3>=1.26.112
 botocore>=1.29.112
 opencv-python-headless>=4.7.0.72
 numpy>=1.21.6
-torch --index-url https://download.pytorch.org/whl/cu118
-torchvision --index-url https://download.pytorch.org/whl/cu118
-torchaudio --index-url https://download.pytorch.org/whl/cu118
+-f https://download.pytorch.org/whl/torch_stable.html
+torch==1.13.1+cu117
+-f https://download.pytorch.org/whl/torch_stable.html
+torchvision==0.14.1+cu117

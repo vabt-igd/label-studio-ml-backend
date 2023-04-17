@@ -25,20 +25,20 @@ from label_studio_ml.utils import get_image_local_path
 
 logger = logging.getLogger(__name__)
 
-url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-request.urlretrieve(url, "sam_vit_b_01ec64.pth")
+url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth'
+request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
 
-DEBUG_IMAGE_PATH_SEG_OUT = os.path.join("images", "in_raw")
-DEBUG_IMAGE_PATH_IN = os.path.join("images", "seg_results")
+DEBUG_IMAGE_PATH_SEG_OUT = os.path.join('images', 'in_raw')
+DEBUG_IMAGE_PATH_IN = os.path.join('images', 'seg_results')
 
 
 class SAMBackend(LabelStudioMLBase):
 
     def __init__(self,
-                 checkpoint_file: Union[str, None] = "sam_vit_b_01ec64.pth",
+                 checkpoint_file: Union[str, None] = 'sam_vit_b_01ec64.pth',
                  image_dir: Union[str, None] = None,
                  score_threshold=0.5,
-                 # device='cpu',  # "cuda"
+                 # device='cpu',  # 'cuda'
                  debug_segmentation_output=False,
                  **kwargs):
         """
@@ -55,7 +55,7 @@ class SAMBackend(LabelStudioMLBase):
         super(SAMBackend, self).__init__(**kwargs)
 
         self.checkpoint_file = checkpoint_file
-        model_type = "vit_b"
+        model_type = 'vit_b'
         self.score_thresh = score_threshold
         self.debug_segmentation_output = debug_segmentation_output
 
@@ -86,7 +86,7 @@ class SAMBackend(LabelStudioMLBase):
 
         sam = sam_model_registry[model_type](checkpoint=checkpoint_file)
         sam.to(device=self.device)
-        self.model = SamAutomaticMaskGenerator(sam, output_mode="binary_mask")
+        self.model = SamAutomaticMaskGenerator(sam, output_mode='binary_mask')
 
     def predict(self, tasks, **kwargs):
         results = []
@@ -108,7 +108,7 @@ class SAMBackend(LabelStudioMLBase):
                 temp_id = ''.join(SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
                                   for _ in
                                   range(10))
-                cv2.imwrite(os.path.join("images", "in_raw", f"input_image_{temp_id}.png"),
+                cv2.imwrite(os.path.join('images', 'in_raw', f'input_image_{temp_id}.png'),
                             cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
             # generate masks
@@ -134,7 +134,7 @@ class SAMBackend(LabelStudioMLBase):
                 result_mask = result_mask.astype(np.uint8)
                 # convert mask to RGBA image
                 got_image = Image.fromarray(result_mask)
-                rgbimg = Image.new("RGBA", got_image.size)
+                rgbimg = Image.new('RGBA', got_image.size)
                 rgbimg.paste(got_image)
 
                 datas = rgbimg.getdata()
@@ -149,7 +149,7 @@ class SAMBackend(LabelStudioMLBase):
                 # get pixels from image
                 pix = np.array(rgbimg)
                 if self.debug_segmentation_output:
-                    rgbimg.save(os.path.join("images", "seg_results", f"masked_image_{mask_id}.png"))
+                    rgbimg.save(os.path.join('images', 'seg_results', f'masked_image_{mask_id}.png'))
                 # encode to rle
                 result_mask = encode_rle(pix.flatten())
 
@@ -163,7 +163,7 @@ class SAMBackend(LabelStudioMLBase):
                         'value': {
                             'format': 'rle',
                             'rle': result_mask,
-                            'brushlabels': ["segment_" + mask_id]
+                            'brushlabels': ['segment_' + mask_id]
                         },
                         'score': score
                     },
@@ -171,7 +171,8 @@ class SAMBackend(LabelStudioMLBase):
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)
 
-        print(f"Segmentation results:{os.linesep}{results}{os.linesep}")
+        # print(f'Segmentation results:{os.linesep}{results}{os.linesep}')
+        print(f'Segmentation finished! Sending results to server...')
 
         return [{
             'result': results,

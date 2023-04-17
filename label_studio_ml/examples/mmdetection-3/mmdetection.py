@@ -79,8 +79,8 @@ class MMDetection(LabelStudioMLBase):
         from_name, schema = list(self.parsed_label_config.items())[0]
         to_name = schema['to_name'][0]
         classes = self.model.dataset_meta.get('classes')
-        print(f"New prediction request!{os.linesep}")
-        print(f"Model recognizes the following classes:{os.linesep}{classes}{os.linesep}")
+        print(f'New prediction request!{os.linesep}')
+        print(f'Model recognizes the following classes:{os.linesep}{classes}{os.linesep}')
         print(f'Tasks to complete: {len(tasks)}{os.linesep}')
 
         for task in tasks:
@@ -88,7 +88,7 @@ class MMDetection(LabelStudioMLBase):
             image_path = self.get_local_path(image_url)
             model_results = inference_detector(self.model, image_path).pred_instances
             img_width, img_height = get_image_size(image_path)
-            print(f"Model predicted {len(model_results)} labels.{os.linesep}")
+            print(f'Model predicted {len(model_results)} labels.{os.linesep}')
 
             for item in model_results:
                 bboxes, label, scores = item['bboxes'], item['labels'], item['scores']
@@ -98,8 +98,8 @@ class MMDetection(LabelStudioMLBase):
                                                          + string.ascii_lowercase
                                                          + string.digits))
                 if score < self.score_thresh:
-                    print(f"Prediction [{label}] : {output_label}{os.linesep} not accepted. "
-                          f"Score too low: {score} < {self.score_thresh} (threshold)")
+                    print(f'Prediction [{label}] : {output_label}{os.linesep} not accepted. '
+                          f'Score too low: {score} < {self.score_thresh} (threshold)')
                     continue
 
                 for bbox in bboxes:
@@ -107,10 +107,10 @@ class MMDetection(LabelStudioMLBase):
                     if not bbox:
                         continue
 
-                    print(f"Prediction accepted:{os.linesep}"
-                          f" - label:\t{output_label}{os.linesep}",
-                          f" - bbox:\t{bbox}{os.linesep}",
-                          f" - score:\t{score}{os.linesep}"
+                    print(f'Prediction accepted:{os.linesep}'
+                          f' - label:\t{output_label}{os.linesep}',
+                          f' - bbox:\t{bbox}{os.linesep}',
+                          f' - score:\t{score}{os.linesep}'
                           f' - random id:\t\t{label_id}{os.linesep}')
 
                     x, y, xmax, ymax = bbox[:4]
@@ -121,7 +121,7 @@ class MMDetection(LabelStudioMLBase):
                             'type': 'rectanglelabels',
                             'id': label_id,
                             'value': {
-                                'rectanglelabels': [output_label],
+                                'rectanglelabels': [''.join(output_label)],
                                 'x': float(x) / img_width * 100,
                                 'y': float(y) / img_height * 100,
                                 'width': (float(xmax) - float(x)) / img_width * 100,
@@ -133,7 +133,8 @@ class MMDetection(LabelStudioMLBase):
                     all_scores.append(score)
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)
-        print(f"Classification results:{os.linesep}{results}{os.linesep}")
+        # print(f'Classification results:{os.linesep}{results}{os.linesep}')
+        print(f'Prediction finished! Sending results to server...')
         return [{
             'result': results,
             'score': avg_score

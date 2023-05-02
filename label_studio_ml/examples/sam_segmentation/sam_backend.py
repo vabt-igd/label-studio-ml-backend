@@ -140,7 +140,8 @@ class SAMBackend(LabelStudioMLBase):
                 datas = rgbimg.getdata()
                 # make pixels transparent
                 new_data = []
-                random_color = tuple(((np.random.random(size=3)*256).astype(np.uint8), 255))
+                random_color = tuple((np.random.random(size=3)*256).astype(np.uint8))
+                random_color = (*random_color, 255)
                 for item in datas:
                     if item[0] == 0 and item[1] == 0 and item[2] == 0:
                         new_data.append((0, 0, 0, 0))

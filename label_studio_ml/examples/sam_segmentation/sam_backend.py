@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import math
 import os
 import string
 from random import SystemRandom
@@ -30,6 +31,7 @@ request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
 
 DEBUG_IMAGE_PATH_SEG_OUT = os.path.join('images', 'in_raw')
 DEBUG_IMAGE_PATH_IN = os.path.join('images', 'seg_results')
+TARGET_IMAGE_PXL_COUNT = 1920*1080
 
 
 class SAMBackend(LabelStudioMLBase):
@@ -102,6 +104,27 @@ class SAMBackend(LabelStudioMLBase):
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
             h, w, c = image.shape
+            pixel_count = h * w
+
+            # pixel count of a full hd image:
+            # ensure to stay within the limits of 8GB VRAM of the Cuda device
+            if pixel_count > TARGET_IMAGE_PXL_COUNT:
+                scale_factor = TARGET_IMAGE_PXL_COUNT / pixel_count
+                max_width = w * scale_factor
+                max_height = h * scale_factor
+                ratio_gcd = math.gcd(w, h)
+                new_width = w / ratio_gcd
+                new_height = h / ratio_gcd
+                ratio_width = math.floor(max_width / new_width) * new_width
+                ratio_height = math.floor(max_height / new_height) * new_height
+                scaled_size = (max_width, max_height)
+
+                # If GCD > 1 the image can be scaled keeping the original aspect ratio
+                # otherwise it'll be approximated
+                if ratio_gcd > 1:
+                    scaled_size = (ratio_width, ratio_height)
+
+                image = cv2.resize(image, scaled_size, interpolation=cv2.INTER_LINEAR)
 
             # save the image for debug purposes
             if self.debug_segmentation_output:
@@ -148,6 +171,11 @@ class SAMBackend(LabelStudioMLBase):
                     else:
                         new_data.append(random_color)
                 rgbimg.putdata(new_data)
+
+                # upscale image if necessary
+                if pixel_count > TARGET_IMAGE_PXL_COUNT:
+                    rgbimg = rgbimg.resize((w, h))
+
                 # get pixels from image
                 pix = np.array(rgbimg)
                 if self.debug_segmentation_output:

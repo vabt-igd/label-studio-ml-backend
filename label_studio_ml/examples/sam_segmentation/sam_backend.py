@@ -124,7 +124,7 @@ class SAMBackend(LabelStudioMLBase):
                 if ratio_gcd > 1:
                     scaled_size = (ratio_width, ratio_height)
 
-                image = cv2.resize(image, scaled_size, 0, 0, interpolation=cv2.INTER_LINEAR)
+                image = cv2.resize(image, np.array(scaled_size).astype(int), 0, 0, interpolation=cv2.INTER_LINEAR)
 
             # save the image for debug purposes
             if self.debug_segmentation_output:

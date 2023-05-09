@@ -103,7 +103,7 @@ class SAMBackend(LabelStudioMLBase):
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
-            h, w, c = image.shape
+            h, w = image.shape[:2]
             pixel_count = h * w
 
             # pixel count of a full hd image:
@@ -124,7 +124,7 @@ class SAMBackend(LabelStudioMLBase):
                 if ratio_gcd > 1:
                     scaled_size = (ratio_width, ratio_height)
 
-                image = cv2.resize(image, scaled_size, interpolation=cv2.INTER_LINEAR)
+                image = cv2.resize(image, scaled_size, 0, 0, interpolation=cv2.INTER_LINEAR)
 
             # save the image for debug purposes
             if self.debug_segmentation_output:

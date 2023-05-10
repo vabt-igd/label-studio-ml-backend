@@ -1,11 +1,10 @@
 import io
 import json
 import logging
-import math
 import os
 import string
 from random import SystemRandom
-from typing import List, Dict, Any, Union
+from typing import Union
 from urllib import request
 from urllib.parse import urlparse
 
@@ -14,7 +13,6 @@ import torch
 from botocore.exceptions import ClientError
 import cv2
 import numpy as np
-from PIL import Image
 
 from label_studio_converter.brush import encode_rle
 from label_studio_tools.core.utils.io import get_data_dir
@@ -99,43 +97,33 @@ class SAMBackend(LabelStudioMLBase):
 
         print(f'Tasks to complete: {len(tasks)}{os.linesep}')
         for task in tqdm(tasks):
-            print(f'Current task: {task}{os.linesep}')
+            print(f'{os.linesep}Current task: {task}{os.linesep}')
             image_url = self._get_image_url(task)
             image_path = get_image_local_path(image_url, image_dir=self.image_dir)
             image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
             h, w = image.shape[:2]
             pixel_count = h * w
 
-            # pixel count of a full hd image:
-            # ensure to stay within the limits of 8GB VRAM of the Cuda device
             if pixel_count > TARGET_IMAGE_PXL_COUNT:
                 scale_factor = TARGET_IMAGE_PXL_COUNT / pixel_count
                 max_width = w * scale_factor
                 max_height = h * scale_factor
-                ratio_gcd = math.gcd(w, h)
+                ratio_gcd = np.gcd(w, h)
                 new_width = w / ratio_gcd
                 new_height = h / ratio_gcd
-                ratio_width = math.floor(max_width / new_width) * new_width
-                ratio_height = math.floor(max_height / new_height) * new_height
+                ratio_width = np.floor(max_width / new_width) * new_width
+                ratio_height = np.floor(max_height / new_height) * new_height
                 scaled_size = (max_width, max_height)
 
-                # If GCD > 1 the image can be scaled keeping the original aspect ratio
-                # otherwise it'll be approximated
                 if ratio_gcd > 1:
                     scaled_size = (ratio_width, ratio_height)
 
-                image = cv2.resize(image, np.array(scaled_size).astype(int), 0, 0, interpolation=cv2.INTER_LINEAR)
-
-            # save the image for debug purposes
-            if self.debug_segmentation_output:
-                temp_id = ''.join(SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
-                                  for _ in
-                                  range(10))
-                cv2.imwrite(os.path.join('images', 'in_raw', f'input_image_{temp_id}.png'),
-                            cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+                image = cv2.resize(image, np.array(scaled_size).astype(int), 0, 0, interpolation=cv2.INTER_AREA)
 
             # generate masks
-            masks: List[Dict[str, Any]] = self.model.generate(image)
+            all_scores = []
+            results = []
+            masks = self.model.generate(image)
             for mask in tqdm(masks):
                 segmentation = mask.get('segmentation')
                 score = mask.get('stability_score')
@@ -146,7 +134,7 @@ class SAMBackend(LabelStudioMLBase):
                                   range(10))
 
                 all_scores.append(score)
-                print(f'Current mask:{os.linesep}'
+                print(f'{os.linesep}Current mask:{os.linesep}'
                       f' - bounding box:\t{mask.get("bbox")}{os.linesep}'
                       f' - score:\t\t{score}{os.linesep}'
                       f' - random id:\t\t{mask_id}{os.linesep}')
@@ -155,33 +143,20 @@ class SAMBackend(LabelStudioMLBase):
                 result_mask = _result_mask.copy()
                 result_mask[segmentation > 0] = 255
                 result_mask = result_mask.astype(np.uint8)
-                # convert mask to RGBA image
-                got_image = Image.fromarray(result_mask)
-                rgbimg = Image.new('RGBA', got_image.size)
-                rgbimg.paste(got_image)
 
-                datas = rgbimg.getdata()
-                # make pixels transparent
-                new_data = []
-                random_color = tuple((np.random.random(size=3)*256).astype(np.uint8))
-                random_color = (*random_color, 255)
-                for item in datas:
-                    if item[0] == 0 and item[1] == 0 and item[2] == 0:
-                        new_data.append((0, 0, 0, 0))
-                    else:
-                        new_data.append(random_color)
-                rgbimg.putdata(new_data)
+                # convert mask to RGBA image
+                rgbimg = cv2.merge((result_mask.copy(), result_mask.copy(), result_mask.copy(), result_mask.copy()))
+                print(f'{os.linesep} -> SAM result mask successfully converted to an image!{os.linesep}')
 
                 # upscale image if necessary
                 if pixel_count > TARGET_IMAGE_PXL_COUNT:
-                    rgbimg = rgbimg.resize((w, h))
+                    rgbimg = cv2.resize(rgbimg, np.array((w, h)).astype(int), 0, 0, interpolation=cv2.INTER_CUBIC)
+                print(f'{os.linesep} -> mask successfully upscaled!{os.linesep}')
 
                 # get pixels from image
-                pix = np.array(rgbimg)
-                if self.debug_segmentation_output:
-                    rgbimg.save(os.path.join('images', 'seg_results', f'masked_image_{mask_id}.png'))
+                # pix = np.array(rgbimg)
                 # encode to rle
-                result_mask = encode_rle(pix.flatten())
+                result_mask = encode_rle(rgbimg.flatten())
 
                 # for each task, return classification results in the form of "choices" pre-annotations
                 results.append(

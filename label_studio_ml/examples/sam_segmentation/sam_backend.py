@@ -29,7 +29,7 @@ request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
 
 DEBUG_IMAGE_PATH_SEG_OUT = os.path.join('images', 'in_raw')
 DEBUG_IMAGE_PATH_IN = os.path.join('images', 'seg_results')
-TARGET_IMAGE_PXL_COUNT = 1920*1080
+TARGET_IMAGE_PXL_COUNT = 2560*1440
 
 
 class SAMBackend(LabelStudioMLBase):

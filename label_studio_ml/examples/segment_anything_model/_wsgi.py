@@ -3,32 +3,32 @@ import argparse
 import logging
 import logging.config
 
-logging.config.dictConfig({{
+logging.config.dictConfig({
   "version": 1,
-  "formatters": {{
-    "standard": {{
+  "formatters": {
+    "standard": {
       "format": "[%(asctime)s] [%(levelname)s] [%(name)s::%(funcName)s::%(lineno)d] %(message)s"
-    }}
-  }},
-  "handlers": {{
-    "console": {{
+    }
+  },
+  "handlers": {
+    "console": {
       "class": "logging.StreamHandler",
       "level": "DEBUG",
       "stream": "ext://sys.stdout",
       "formatter": "standard"
-    }}
-  }},
-  "root": {{
+    }
+  },
+  "root": {
     "level": "ERROR",
     "handlers": [
       "console"
     ],
     "propagate": True
-  }}
-}})
+  }
+})
 
 from label_studio_ml.api import init_app
-from {script} import {model_class}
+from segment_anything_model import MyModel
 
 
 _DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
@@ -87,7 +87,7 @@ if __name__ == "__main__":
                 param[k] = int(v)
             elif v == 'True' or v == 'true':
                 param[k] = True
-            elif v == 'False' or v == 'false':
+            elif v == 'False' or v == 'False':
                 param[k] = False
             elif isfloat(v):
                 param[k] = float(v)
@@ -101,11 +101,11 @@ if __name__ == "__main__":
         kwargs.update(parse_kwargs())
 
     if args.check:
-        print('Check "' + {model_class}.__name__ + '" instance creation..')
-        model = {model_class}(**kwargs)
+        print('Check "' + MyModel.__name__ + '" instance creation..')
+        model = MyModel(**kwargs)
 
     app = init_app(
-        model_class={model_class},
+        model_class=MyModel,
         model_dir=os.environ.get('MODEL_DIR', args.model_dir),
         redis_queue=os.environ.get('RQ_QUEUE_NAME', 'default'),
         redis_host=os.environ.get('REDIS_HOST', 'localhost'),
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 else:
     # for uWSGI use
     app = init_app(
-        model_class={model_class},
+        model_class=MyModel,
         model_dir=os.environ.get('MODEL_DIR', os.path.dirname(__file__)),
         redis_queue=os.environ.get('RQ_QUEUE_NAME', 'default'),
         redis_host=os.environ.get('REDIS_HOST', 'localhost'),

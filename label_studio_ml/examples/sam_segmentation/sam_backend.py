@@ -69,9 +69,13 @@ class SAMBackend(LabelStudioMLBase):
         if torch.cuda.is_available():
             device_idx = torch.cuda.current_device()
             self.device = 'cuda:' + str(device_idx)
+            self.device_str = 'cuda: ' + str(device_idx) + ' - ' + str(torch.cuda.get_device_name(device_idx))
             print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}{os.linesep}')
         else:
             self.device = 'cpu'
+            from cpuinfo import get_cpu_info
+            info = get_cpu_info()
+            self.device_str = 'cpu: ' + info['brand_raw'] + " | Arch: " + info['arch_string_raw']
             print('Inference using the CPU')
             print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
 
@@ -82,7 +86,7 @@ class SAMBackend(LabelStudioMLBase):
         print(f'Model config:{os.linesep}'
               f' - checkpoint:\t{checkpoint_file}{os.linesep}'
               f' - model type:\t{model_type}{os.linesep}'
-              f' - device used:\t{self.device}{os.linesep}')
+              f' - device used:\t{self.device_str}{os.linesep}')
 
         sam = sam_model_registry[model_type](checkpoint=checkpoint_file)
         sam.to(device=self.device)

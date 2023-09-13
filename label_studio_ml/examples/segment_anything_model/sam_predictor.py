@@ -10,6 +10,10 @@ from label_studio_ml.utils import get_image_local_path, InMemoryLRUDictCache
 
 logger = logging.getLogger(__name__)
 
+logger.info("Downloading 'sam_vit_b_01ec64.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/'...")
+url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth'
+request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
+
 VITH_CHECKPOINT = os.environ.get("VITH_CHECKPOINT", "sam_vit_h_4b8939.pth")
 ONNX_CHECKPOINT = os.environ.get("ONNX_CHECKPOINT", "sam_onnx_quantized_example.onnx")
 MOBILESAM_CHECKPOINT = os.environ.get("MOBILESAM_CHECKPOINT", "mobile_sam.pt")
@@ -62,13 +66,11 @@ class SAMPredictor(object):
                 self.device_str = 'cpu: ' + info['brand_raw'] + " | Arch: " + info['arch_string_raw']
                 print('Inference using the CPU')
                 print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
-
+            
             self.model_checkpoint = VITH_CHECKPOINT
             if self.model_checkpoint is None:
+                logger.warning("No checkpoint set, using 'sam_vit_b_01ec64.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/' to continue execution...")
                 # raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
-                logger.warning("No checkpoint, downloading 'sam_vit_b_01ec64.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/' to continue execution...")
-                url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth'
-                request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
                 self.model_checkpoint = 'sam_vit_b_01ec64.pth'
 
             logger.info(f"Using SAM checkpoint {self.model_checkpoint}")

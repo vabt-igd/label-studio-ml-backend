@@ -6,7 +6,7 @@ from uuid import uuid4
 from sam_predictor import SAMPredictor
 from label_studio_ml.model import LabelStudioMLBase
 
-SAM_CHOICE = os.environ.get("SAM_CHOICE", "MobileSAM")  # other option is just SAM
+SAM_CHOICE = os.environ.get("SAM_CHOICE", "SAM")  # other option is just SAM
 PREDICTOR = SAMPredictor(SAM_CHOICE)
 
 

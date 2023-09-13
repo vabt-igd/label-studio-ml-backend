@@ -31,6 +31,7 @@ logging.config.dictConfig({
 from label_studio_ml.api import init_app
 from model import SamMLBackend
 
+
 _DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
 
 
@@ -87,7 +88,7 @@ if __name__ == "__main__":
                 param[k] = int(v)
             elif v == 'True' or v == 'true':
                 param[k] = True
-            elif v == 'False' or v == 'False':
+            elif v == 'False' or v == 'false':
                 param[k] = False
             elif isfloat(v):
                 param[k] = float(v)

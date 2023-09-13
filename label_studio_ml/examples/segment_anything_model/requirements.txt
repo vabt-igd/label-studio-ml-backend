@@ -11,3 +11,9 @@ timm==0.4.12
 segment_anything @ git+https://github.com/facebookresearch/segment-anything.git
 mobile-sam @ git+https://github.com/ChaoningZhang/MobileSAM.git
 label-studio-ml @ git+https://github.com/heartexlabs/label-studio-ml-backend.git
+
+-f https://download.pytorch.org/whl/torch_stable.html
+torch==2.0.1+cu117
+-f https://download.pytorch.org/whl/torch_stable.html
+torchvision==0.15.2+cu117
+py-cpuinfo>=9.0.0

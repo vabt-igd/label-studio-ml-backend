@@ -3,6 +3,7 @@ import logging
 import torch
 import cv2
 import numpy as np
+from urllib import request
 
 from typing import List, Dict, Optional
 from label_studio_ml.utils import get_image_local_path, InMemoryLRUDictCache
@@ -18,7 +19,7 @@ LABEL_STUDIO_HOST = os.environ.get("LABEL_STUDIO_HOST")
 
 class SAMPredictor(object):
 
-    def __init__(self, model_choice):
+    def __init__(self, model_choice: str):
         self.model_choice = model_choice
 
         # cache for embeddings
@@ -49,9 +50,26 @@ class SAMPredictor(object):
         elif model_choice == 'SAM':
             from segment_anything import SamPredictor, sam_model_registry
 
+            if torch.cuda.is_available():
+                device_idx = torch.cuda.current_device()
+                self.device = 'cuda:' + str(device_idx)
+                self.device_str = 'cuda: ' + str(device_idx) + ' - ' + str(torch.cuda.get_device_name(device_idx))
+                print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}{os.linesep}')
+            else:
+                self.device = 'cpu'
+                from cpuinfo import get_cpu_info
+                info = get_cpu_info()
+                self.device_str = 'cpu: ' + info['brand_raw'] + " | Arch: " + info['arch_string_raw']
+                print('Inference using the CPU')
+                print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
+
             self.model_checkpoint = VITH_CHECKPOINT
             if self.model_checkpoint is None:
-                raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
+                # raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
+                logger.warning("No checkpoint, downloading 'sam_vit_b_01ec64.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/' to continue execution...")
+                url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth'
+                request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
+                self.model_checkpoint = 'sam_vit_b_01ec64.pth'
 
             logger.info(f"Using SAM checkpoint {self.model_checkpoint}")
             reg_key = "vit_h"
@@ -75,7 +93,7 @@ class SAMPredictor(object):
     def model_name(self):
         return f'{self.model_choice}:{self.model_checkpoint}:{self.device}'
 
-    def set_image(self, img_path, calculate_embeddings=True):
+    def set_image(self, img_path: str, calculate_embeddings=True):
         payload = self.cache.get(img_path)
         if payload is None:
             # Get image and embeddings
@@ -102,7 +120,7 @@ class SAMPredictor(object):
 
     def predict_onnx(
         self,
-        img_path,
+        img_path: str,
         point_coords: Optional[List[List]] = None,
         point_labels: Optional[List] = None,
         input_box: Optional[List] = None
@@ -159,7 +177,7 @@ class SAMPredictor(object):
 
     def predict_sam(
         self,
-        img_path,
+        img_path: str,
         point_coords: Optional[List[List]] = None,
         point_labels: Optional[List] = None,
         input_box: Optional[List] = None

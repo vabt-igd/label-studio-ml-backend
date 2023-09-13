@@ -1,18 +1,16 @@
-import os
 import logging
+import os
+import pathlib
+from typing import List, Dict, Optional
+from urllib import request
+
 import torch
 import cv2
 import numpy as np
-from urllib import request
-
-from typing import List, Dict, Optional
 from label_studio_ml.utils import get_image_local_path, InMemoryLRUDictCache
 
-logger = logging.getLogger(__name__)
 
-logger.info("Downloading 'sam_vit_b_01ec64.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/'...")
-url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth'
-request.urlretrieve(url, 'sam_vit_b_01ec64.pth')
+logger = logging.getLogger(__name__)
 
 VITH_CHECKPOINT = os.environ.get("VITH_CHECKPOINT", "sam_vit_h_4b8939.pth")
 ONNX_CHECKPOINT = os.environ.get("ONNX_CHECKPOINT", "sam_onnx_quantized_example.onnx")
@@ -66,13 +64,20 @@ class SAMPredictor(object):
                 self.device_str = 'cpu: ' + info['brand_raw'] + " | Arch: " + info['arch_string_raw']
                 print('Inference using the CPU')
                 print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
-            
+                
             self.model_checkpoint = VITH_CHECKPOINT
             if self.model_checkpoint is None:
-                logger.warning("No checkpoint set, using 'sam_vit_b_01ec64.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/' to continue execution...")
                 # raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
-                self.model_checkpoint = 'sam_vit_b_01ec64.pth'
-
+                logger.warning("No checkpoint set, using 'sam_vit_h_4b8939.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/' to continue execution...")
+                self.model_checkpoint = 'sam_vit_h_4b8939.pth'
+            
+            file_path = pathlib.Path(__file__).parent.resolve()
+            print(f"Downloading '{self.model_checkpoint}' from 'https://dl.fbaipublicfiles.com/segment_anything/'...")
+            url = 'https://dl.fbaipublicfiles.com/segment_anything/' + self.model_checkpoint
+            sam_local_checkpoint = os.path.join(file_path, self.model_checkpoint)
+            request.urlretrieve(url, sam_local_checkpoint)
+            self.model_checkpoint = sam_local_checkpoint
+            
             logger.info(f"Using SAM checkpoint {self.model_checkpoint}")
             reg_key = "vit_h"
 

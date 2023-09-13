@@ -18,8 +18,8 @@ Creating a virtual environment using venv and installing base dependencies...
  "
 python -m venv ml-backend-venv
 source ml-backend-venv/Scripts/activate # assuming you're on bash or zsh
-pip install -U pip
-pip install -U -e .
+pip install -U pip setuptools wheel
+# pip install -U -e .
 
 
 echo " 

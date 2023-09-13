@@ -1,7 +1,8 @@
 #!/bin/bash
-BACKEND_CODE_PATH=./label_studio_ml/examples/sam_segmentation
-BACKEND_BUILD_PATH=./sam_backend
-BACKEND_SCRIPT=sam_backend.py
+BACKEND_CODE_PATH=./label_studio_ml/examples/segment_anything_model
+BACKEND_BUILD_PATH=./ls_sam_backend
+BACKEND_SCRIPT=model.py
+VENV_FOLDER=./ls-sam-venv
 
 echo " 
 ===================================================
@@ -16,9 +17,10 @@ echo "
 ===================================================
 Creating a virtual environment using venv and installing base dependencies...
  "
-python -m venv ml-backend-venv
-source ml-backend-venv/Scripts/activate # assuming you're on bash or zsh
-pip install -U pip setuptools wheel
+python -m venv $VENV_FOLDER
+source $VENV_FOLDER/Scripts/activate # assuming you're on bash or zsh
+pip install -U pip 
+pip install -U wheel setuptools
 # pip install -U -e .
 
 
@@ -26,8 +28,9 @@ echo "
 ===================================================
 Installing backend depedencies...
  "
-pip install -r $BACKEND_CODE_PATH/requirements.txt
 
+pip install -r $BACKEND_CODE_PATH/requirements.txt
+SAM_CHOICE="SAM" # MobileSAM
 
 echo " 
 ===================================================
@@ -43,4 +46,4 @@ Starting the backend...
  "
 # label-studio-ml start $BACKEND_BUILD_PATH
 cd $BACKEND_BUILD_PATH
-python _wsgi.py -p 1717
+python _wsgi.py -p 1718

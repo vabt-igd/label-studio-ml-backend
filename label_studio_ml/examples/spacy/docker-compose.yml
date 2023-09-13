@@ -5,9 +5,11 @@ services:
     container_name: ml-backend
     build: .
     environment:
-      - MODEL_DIR=/data/models
       - WORKERS=2
       - THREADS=4
       - LOG_LEVEL=DEBUG
+      - MODEL_DIR=/data/models
+    volumes:
+      - "./data:/data"
     ports:
       - "9090:9090"

@@ -4,8 +4,10 @@ import torch
 import cv2
 import pathlib
 import numpy as np
+import ntpath
 
 from typing import List, Dict, Optional
+from urllib import request
 from label_studio_ml.utils import InMemoryLRUDictCache
 from label_studio_tools.core.utils.io import get_local_path
 
@@ -38,6 +40,9 @@ class SAMPredictor(object):
         if model_choice == 'ONNX':
             import onnxruntime
             from segment_anything import sam_model_registry, SamPredictor
+            
+            logger.info(f"Using SAM checkpoint {self.model_checkpoint}")
+            reg_key = "vit_h"
 
             self.model_checkpoint = VITH_CHECKPOINT
             if self.model_checkpoint is None:
@@ -55,6 +60,13 @@ class SAMPredictor(object):
             self.model_checkpoint = VITH_CHECKPOINT
             if self.model_checkpoint is None:
                 raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
+            
+            if not os.path.isfile(self.model_checkpoint):
+                print(f"Downloading '{self.model_checkpoint}' from 'https://dl.fbaipublicfiles.com/segment_anything/'...")
+                url = 'https://dl.fbaipublicfiles.com/segment_anything/' + ntpath.basename(self.model_checkpoint)
+                os.makedirs(os.path.dirname(self.model_checkpoint), exist_ok=True)
+                request.urlretrieve(url, self.model_checkpoint)
+                self.model_checkpoint = self.model_checkpoint
 
             logger.info(f"Using SAM checkpoint {self.model_checkpoint}")
             reg_key = "vit_h"
@@ -65,10 +77,31 @@ class SAMPredictor(object):
             self.model_checkpoint = MOBILESAM_CHECKPOINT
             if not self.model_checkpoint:
                 raise FileNotFoundError("MOBILE_CHECKPOINT is not set: please set it to the path to the MobileSAM checkpoint")
+            
+            if not os.path.isfile(self.model_checkpoint):
+                print(f"Downloading '{self.model_checkpoint}' from 'https://github.com/ChaoningZhang/MobileSAM/raw/master/weights/'...")
+                url = 'https://github.com/ChaoningZhang/MobileSAM/raw/master/weights/' + ntpath.basename(self.model_checkpoint)
+                os.makedirs(os.path.dirname(self.model_checkpoint), exist_ok=True)
+                request.urlretrieve(url, self.model_checkpoint)
+                self.model_checkpoint = self.model_checkpoint
+
             logger.info(f"Using MobileSAM checkpoint {self.model_checkpoint}")
             reg_key = 'vit_t'
         else:
             raise ValueError(f"Invalid model choice {model_choice}")
+
+        if torch.cuda.is_available():
+            device_idx = torch.cuda.current_device()
+            self.device = 'cuda:' + str(device_idx)
+            self.device_str = 'cuda: ' + str(device_idx) + ' - ' + str(torch.cuda.get_device_name(device_idx))
+            print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}{os.linesep}')
+        else:
+            self.device = 'cpu'
+            from cpuinfo import get_cpu_info
+            info = get_cpu_info()
+            self.device_str = 'cpu: ' + info['brand_raw'] + " | Arch: " + info['arch_string_raw']
+            print('Inference using the CPU')
+            print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
 
         sam = sam_model_registry[reg_key](checkpoint=self.model_checkpoint)
         sam.to(device=self.device)

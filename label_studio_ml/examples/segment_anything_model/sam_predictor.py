@@ -1,27 +1,27 @@
-import logging
 import os
-import pathlib
-from typing import List, Dict, Optional
-from urllib import request
-
+import logging
 import torch
 import cv2
+import pathlib
 import numpy as np
-from label_studio_ml.utils import get_image_local_path, InMemoryLRUDictCache
 
+from typing import List, Dict, Optional
+from label_studio_ml.utils import InMemoryLRUDictCache
+from label_studio_tools.core.utils.io import get_local_path
 
 logger = logging.getLogger(__name__)
+_MODELS_DIR = pathlib.Path(__file__).parent / "models"
 
-VITH_CHECKPOINT = os.environ.get("VITH_CHECKPOINT", "sam_vit_h_4b8939.pth")
-ONNX_CHECKPOINT = os.environ.get("ONNX_CHECKPOINT", "sam_onnx_quantized_example.onnx")
-MOBILESAM_CHECKPOINT = os.environ.get("MOBILESAM_CHECKPOINT", "mobile_sam.pt")
+VITH_CHECKPOINT = os.environ.get("VITH_CHECKPOINT", _MODELS_DIR / "sam_vit_h_4b8939.pth")
+ONNX_CHECKPOINT = os.environ.get("ONNX_CHECKPOINT", _MODELS_DIR / "sam_onnx_quantized_example.onnx")
+MOBILESAM_CHECKPOINT = os.environ.get("MOBILESAM_CHECKPOINT", _MODELS_DIR / "mobile_sam.pt")
 LABEL_STUDIO_ACCESS_TOKEN = os.environ.get("LABEL_STUDIO_ACCESS_TOKEN")
 LABEL_STUDIO_HOST = os.environ.get("LABEL_STUDIO_HOST")
 
 
 class SAMPredictor(object):
 
-    def __init__(self, model_choice: str):
+    def __init__(self, model_choice):
         self.model_choice = model_choice
 
         # cache for embeddings
@@ -52,32 +52,10 @@ class SAMPredictor(object):
         elif model_choice == 'SAM':
             from segment_anything import SamPredictor, sam_model_registry
 
-            if torch.cuda.is_available():
-                device_idx = torch.cuda.current_device()
-                self.device = 'cuda:' + str(device_idx)
-                self.device_str = 'cuda: ' + str(device_idx) + ' - ' + str(torch.cuda.get_device_name(device_idx))
-                print(f'Inference using CUDA on device {device_idx}: {torch.cuda.get_device_name(device_idx)}{os.linesep}')
-            else:
-                self.device = 'cpu'
-                from cpuinfo import get_cpu_info
-                info = get_cpu_info()
-                self.device_str = 'cpu: ' + info['brand_raw'] + " | Arch: " + info['arch_string_raw']
-                print('Inference using the CPU')
-                print(f'NOTE: This may be to slow for label studio to work reliably!{os.linesep}')
-                
             self.model_checkpoint = VITH_CHECKPOINT
             if self.model_checkpoint is None:
-                # raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
-                logger.warning("No checkpoint set, using 'sam_vit_h_4b8939.pth' from 'https://dl.fbaipublicfiles.com/segment_anything/' to continue execution...")
-                self.model_checkpoint = 'sam_vit_h_4b8939.pth'
-            
-            file_path = pathlib.Path(__file__).parent.resolve()
-            print(f"Downloading '{self.model_checkpoint}' from 'https://dl.fbaipublicfiles.com/segment_anything/'...")
-            url = 'https://dl.fbaipublicfiles.com/segment_anything/' + self.model_checkpoint
-            sam_local_checkpoint = os.path.join(file_path, self.model_checkpoint)
-            request.urlretrieve(url, sam_local_checkpoint)
-            self.model_checkpoint = sam_local_checkpoint
-            
+                raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
+
             logger.info(f"Using SAM checkpoint {self.model_checkpoint}")
             reg_key = "vit_h"
 
@@ -100,15 +78,16 @@ class SAMPredictor(object):
     def model_name(self):
         return f'{self.model_choice}:{self.model_checkpoint}:{self.device}'
 
-    def set_image(self, img_path: str, calculate_embeddings=True):
+    def set_image(self, img_path, calculate_embeddings=True, task=None):
         payload = self.cache.get(img_path)
         if payload is None:
             # Get image and embeddings
             logger.debug(f'Payload not found for {img_path} in `IN_MEM_CACHE`: calculating from scratch')
-            image_path = get_image_local_path(
+            image_path = get_local_path(
                 img_path,
-                label_studio_access_token=LABEL_STUDIO_ACCESS_TOKEN,
-                label_studio_host=LABEL_STUDIO_HOST
+                access_token=LABEL_STUDIO_ACCESS_TOKEN,
+                hostname=LABEL_STUDIO_HOST,
+                task_id=task.get('id')
             )
             image = cv2.imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -127,13 +106,14 @@ class SAMPredictor(object):
 
     def predict_onnx(
         self,
-        img_path: str,
+        img_path,
         point_coords: Optional[List[List]] = None,
         point_labels: Optional[List] = None,
-        input_box: Optional[List] = None
+        input_box: Optional[List] = None,
+        task: Optional[Dict] = None
     ):
         # calculate embeddings
-        payload = self.set_image(img_path, calculate_embeddings=True)
+        payload = self.set_image(img_path, calculate_embeddings=True, task=task)
         image_shape = payload['image_shape']
         image_embedding = payload['image_embedding']
 
@@ -184,12 +164,13 @@ class SAMPredictor(object):
 
     def predict_sam(
         self,
-        img_path: str,
+        img_path,
         point_coords: Optional[List[List]] = None,
         point_labels: Optional[List] = None,
-        input_box: Optional[List] = None
+        input_box: Optional[List] = None,
+        task: Optional[Dict] = None
     ):
-        self.set_image(img_path, calculate_embeddings=False)
+        self.set_image(img_path, calculate_embeddings=False, task=task)
         point_coords = np.array(point_coords, dtype=np.float32) if point_coords else None
         point_labels = np.array(point_labels, dtype=np.float32) if point_labels else None
         input_box = np.array(input_box, dtype=np.float32) if input_box else None
@@ -212,12 +193,13 @@ class SAMPredictor(object):
         self, img_path: str,
         point_coords: Optional[List[List]] = None,
         point_labels: Optional[List] = None,
-        input_box: Optional[List] = None
+        input_box: Optional[List] = None,
+        task: Optional[Dict] = None
     ):
         if self.model_choice == 'ONNX':
-            return self.predict_onnx(img_path, point_coords, point_labels, input_box)
+            return self.predict_onnx(img_path, point_coords, point_labels, input_box, task)
         elif self.model_choice in ('SAM', 'MobileSAM'):
-            return self.predict_sam(img_path, point_coords, point_labels, input_box)
+            return self.predict_sam(img_path, point_coords, point_labels, input_box, task)
         else:
             raise NotImplementedError(f"Model choice {self.model_choice} is not supported yet")
 

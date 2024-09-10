@@ -25,6 +25,12 @@ see the [segment_anything_2_image repository](https://github.com/HumanSignal/lab
 
 ![sam2](./Sam2Video.gif)
 
+## Before you begin
+
+Before you begin, you must install the [Label Studio ML backend](https://github.com/HumanSignal/label-studio-ml-backend?tab=readme-ov-file#quickstart). 
+
+This tutorial uses the [`segment_anything_2_video` example](https://github.com/HumanSignal/label-studio-ml-backend/tree/master/label_studio_ml/examples/segment_anything_2_video). 
+
 ## Running from source
 
 1. To run the ML backend without Docker, you have to clone the repository and install all dependencies using pip:
@@ -57,19 +63,16 @@ Note that if you're running in a cloud server, you'll need to run on an exposed 
 For your project, you can use any labeling config with video properties. Here's a basic one to get you started!
 
 ```xml     
-    <View>
-         <Labels name="videoLabels" toName="video" allowEmpty="true">
-           
-           
-           
-         <Label value="Player" background="#11A39E"/><Label value="Ball" background="#D4380D"/></Labels>
-         
-         <!-- Please specify FPS carefully, it will be used for all project videos -->
-         <Video name="video" value="$video" framerate="25.0"/>
-         <VideoRectangle name="box" toName="video" smart="true"/>
-      </View><!--{
-       "video": "/static/samples/opossum_snow.mp4"
-      }-->
+<View>
+    <Labels name="videoLabels" toName="video" allowEmpty="true">
+        <Label value="Player" background="#11A39E"/>
+        <Label value="Ball" background="#D4380D"/>
+    </Labels>
+
+    <!-- Please specify FPS carefully, it will be used for all project videos -->
+    <Video name="video" value="$video" framerate="25.0"/>
+    <VideoRectangle name="box" toName="video" smart="true"/>
+</View>
 ```
 
 ## Known limitations

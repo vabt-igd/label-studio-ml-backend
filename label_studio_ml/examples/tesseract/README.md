@@ -29,13 +29,16 @@ Tested against Label Studio 1.10.1, with basic support for both Label Studio
 Local File Storage and S3-compatible storage, with a example data storage with
 MinIO.
 
-## Setup process
+## Before you begin
 
 Before you begin:
 * Ensure git is installed
 * Ensure Docker Compose is installed. For MacOS and Windows users,
    we suggest using Docker Desktop. 
 
+You must also install the [Label Studio ML backend](https://github.com/HumanSignal/label-studio-ml-backend?tab=readme-ov-file#quickstart). 
+
+This tutorial uses the [`tesseract` example](https://github.com/HumanSignal/label-studio-ml-backend/tree/master/label_studio_ml/examples/tesseract). 
 
 ### 1. Install Label Studio
 
@@ -45,7 +48,7 @@ Launch Label Studio. You can follow the guide from the [official documentation](
    docker run -it \
       -p 8080:8080 \
       -v `pwd`/mydata:/label-studio/data \
-      heartex/label-studio:latest
+      heartexlabs/label-studio:latest
    ```
 
    Optionally, you may enable local file serving in Label Studio
@@ -56,7 +59,7 @@ Launch Label Studio. You can follow the guide from the [official documentation](
       -v `pwd`/mydata:/label-studio/data \
       --env LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true \
       --env LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/data/images \
-      heartex/label-studio:latest
+      heartexlabs/label-studio:latest
    ```
    If you're using local file serving, be sure to [get a copy of the API token](https://labelstud.io/guide/user_account#Access-token) from
    Label Studio to connect the model.

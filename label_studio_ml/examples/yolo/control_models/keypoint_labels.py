@@ -1,5 +1,5 @@
 import logging
-from control_models.base import ControlModel
+from control_models.base import ControlModel, get_bool
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,7 @@ class KeypointLabelsModel(ControlModel):
     def __init__(self, **data):
         super().__init__(**data)
 
-        self.add_bboxes = self.control.attr.get("model_add_bboxes", "true").lower() in [
-            "1",
-            "true",
-            "yes",
-        ]
+        self.add_bboxes = get_bool(self.control.attr, "model_add_bboxes", "true")
         self.point_size = float(self.control.attr.get("model_point_size", 1))
         self.point_threshold = float(self.control.attr.get("model_point_threshold", 0))
         self.point_map = self.build_point_mapping()
@@ -40,7 +36,7 @@ class KeypointLabelsModel(ControlModel):
 
     def build_point_mapping(self):
         """Build a mapping between points and Label Studio labels, e.g.
-        <Label value="left_eye" predicted_values="person" model_index="2" /> => {"person::2": "left_eye"}
+        <Label value="nose" predicted_values="person" model_index="0" /> => {"person::0": "nose"}
         """
         mapping = {}
         for value, label_tag in self.control.labels_attrs.items():
@@ -72,6 +68,7 @@ class KeypointLabelsModel(ControlModel):
         keypoints_data = results[0].keypoints  # Get keypoints from the first frame
         bbox_data = results[0].boxes
         image_width = results[0].orig_shape[1]
+        model_names = self.model.names
         regions = []
 
         for bbox_index in range(
@@ -81,14 +78,17 @@ class KeypointLabelsModel(ControlModel):
             point_xyn = (
                 keypoints_data.xyn[bbox_index] * 100
             )  # Convert normalized keypoints to percentages
-            model_label = self.model.names[int(results[0].boxes.cls[bbox_index])]
+            model_label = model_names[int(results[0].boxes.cls[bbox_index])]
 
+            point_logs = "\n".join(
+                [f' model_index="{i}", xy={xyn}' for i, xyn in enumerate(point_xyn)]
+            )
             logger.debug(
                 "----------------------\n"
                 f"task id > {path}\n"
                 f"type: {self.control}\n"
-                f"keypoints > {point_xyn}\n"
                 f"model label > {model_label}\n"
+                f"keypoints >\n{point_logs}\n"
                 f"confidences > {bbox_conf}\n"
             )
 
@@ -118,7 +118,7 @@ class KeypointLabelsModel(ControlModel):
                     logger.warning(
                         f"Point {index_name} not found in point map, "
                         f"you have to define it in the labeling config, e.g.:\n"
-                        f'<Label value="nose" predicted_values="person" index="1" />'
+                        f'<Label value="nose" predicted_values="person" model_index="0" />'
                     )
                     continue
                 point_label = self.point_map[index_name]
@@ -129,10 +129,10 @@ class KeypointLabelsModel(ControlModel):
                     "to_name": self.to_name,
                     "type": "keypointlabels",
                     "value": {
-                        "keypointlabels": [point_label],  # Keypoint label
-                        "width": self.point_size
-                        / image_width
-                        * 100,  # Keypoint width, just visual styling
+                        # point label
+                        "keypointlabels": [point_label],
+                        # point width, just visual styling
+                        "width": self.point_size / image_width * 100,
                         "x": x,
                         "y": y,
                     },

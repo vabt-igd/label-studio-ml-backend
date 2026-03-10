@@ -1,0 +1,8 @@
+# PaddleX is pre-installed in the Docker image
+# These are additional dependencies needed for the ML backend
+
+# S3 support (optional)
+boto3>=1.28.0
+
+# Image processing
+opencv-python-headless>=4.12.0

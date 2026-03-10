@@ -1,0 +1,64 @@
+# GPU configuration for PP-OCR ML Backend
+# Requires NVIDIA GPU with Docker nvidia-container-toolkit
+
+services:
+  ppocr:
+    container_name: ppocr
+    image: heartexlabs/label-studio-ml-backend:ppocr-gpu
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+      args:
+        CUDA_VERSION: ${CUDA_VERSION:-cuda11.8}
+        TEST_ENV: ${TEST_ENV:-false}
+    environment:
+      # PP-OCR version: 'v4', 'v5'
+      - PPOCR_VERSION=${PPOCR_VERSION:-v5}
+
+      # Model selection
+      - MODEL_VARIANT=${MODEL_VARIANT:-server}
+      - OCR_LANG=${OCR_LANG:-ch}
+
+      # Device configuration
+      - DEVICE=${DEVICE:-gpu:0}
+
+      # Score thresholds
+      - SCORE_THRESHOLD=${SCORE_THRESHOLD:-0.5}
+      - DET_SCORE_THRESHOLD=${DET_SCORE_THRESHOLD:-0.3}
+
+      # Output options
+      - OUTPUT_TYPE=${OUTPUT_TYPE:-polygon}
+      - INCLUDE_TRANSCRIPTION=${INCLUDE_TRANSCRIPTION:-true}
+
+      # Document preprocessing (disabled by default)
+      - USE_DOC_ORIENTATION=${USE_DOC_ORIENTATION:-false}
+      - USE_DOC_UNWARPING=${USE_DOC_UNWARPING:-false}
+      - USE_TEXTLINE_ORIENTATION=${USE_TEXTLINE_ORIENTATION:-false}
+
+      # Server configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${WORKERS:-1}
+      - THREADS=${THREADS:-8}
+      - MODEL_DIR=/data/models
+
+      # Basic auth (optional)
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-}
+      - BASIC_AUTH_PASS=${BASIC_AUTH_PASS:-}
+
+      # Label Studio connection (required for accessing uploaded images)
+      - LABEL_STUDIO_URL=${LABEL_STUDIO_URL:-http://host.docker.internal:8080}
+      - LABEL_STUDIO_API_KEY=${LABEL_STUDIO_API_KEY:-your_token_here}
+
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./data/server:/data"
+      - "./data/.file-cache:/data/models/.file-cache"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,64 @@
+services:
+  ppocr:
+    container_name: ppocr
+    image: heartexlabs/label-studio-ml-backend:ppocr-cpu
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TEST_ENV: ${TEST_ENV:-false}
+    environment:
+      # PP-OCR version: 'v4', 'v5'
+      - PPOCR_VERSION=${PPOCR_VERSION:-v5}
+
+      # Model selection
+      # MODEL_VARIANT: 'mobile' (fast) or 'server' (accurate)
+      # Note: 'server' variant only available for Chinese (ch) and English (en)
+      - MODEL_VARIANT=${MODEL_VARIANT:-server}
+
+      # Language code for recognition model
+      # Supported: ch, en, arabic, cyrillic, devanagari, el, eslav, korean, latin, ta, te, th
+      - OCR_LANG=${OCR_LANG:-ch}
+
+      # Device configuration
+      # Options: 'cpu', 'gpu:0', 'gpu:1', etc.
+      - DEVICE=${DEVICE:-cpu}
+
+      # Score thresholds
+      # Recognition confidence threshold (0.0 - 1.0)
+      - SCORE_THRESHOLD=${SCORE_THRESHOLD:-0.5}
+      # Detection confidence threshold (0.0 - 1.0)
+      - DET_SCORE_THRESHOLD=${DET_SCORE_THRESHOLD:-0.3}
+
+      # Output options
+      # OUTPUT_TYPE: 'polygon' or 'rectangle'
+      - OUTPUT_TYPE=${OUTPUT_TYPE:-polygon}
+      # Whether to include OCR text output
+      - INCLUDE_TRANSCRIPTION=${INCLUDE_TRANSCRIPTION:-true}
+
+      # Document preprocessing (optional, disabled by default)
+      - USE_DOC_ORIENTATION=${USE_DOC_ORIENTATION:-false}
+      - USE_DOC_UNWARPING=${USE_DOC_UNWARPING:-false}
+      - USE_TEXTLINE_ORIENTATION=${USE_TEXTLINE_ORIENTATION:-false}
+
+      # Server configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${WORKERS:-1}
+      - THREADS=${THREADS:-8}
+      - MODEL_DIR=/data/models
+
+      # Basic auth (optional)
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-}
+      - BASIC_AUTH_PASS=${BASIC_AUTH_PASS:-}
+
+      # Label Studio connection (required for accessing uploaded images)
+      # Get API key from Label Studio: Account & Settings -> Access Token
+      - LABEL_STUDIO_URL=${LABEL_STUDIO_URL:-http://host.docker.internal:8080}
+      - LABEL_STUDIO_API_KEY=${LABEL_STUDIO_API_KEY:-your_token_here}
+
+    ports:
+      - "9090:9090"
+    volumes:
+      - "./data/server:/data"
+      - "./data/.file-cache:/data/models/.file-cache"

@@ -2,7 +2,9 @@
 
 ## What this is for
 
-This backend connects Label Studio to **IBM Docling SaaS** using the Python **`DoclingServiceClient`** from the **`docling`** package (`from docling.service_client import DoclingServiceClient`). **Conversion runs on Docling’s servers**, not inside this container. For each task it resolves the file (usually via Label Studio–hosted storage), calls **`client.convert(source=…)`** with a local **`Path`** or an **`https://` URL string**, then maps **`result.document`** into **reactcode** predictions for the annotator.
+This backend connects Label Studio to **IBM Docling SaaS** using the Python **`DoclingServiceClient`** from the **`docling`** package (`from docling.service_client import DoclingServiceClient`). **Conversion runs on Docling’s servers**, not inside this container. For each task it resolves the file (usually via Label Studio–hosted storage), calls **`client.convert(source=…)`** with a local **`Path`** or an **`https://` URL string**, then maps **`result.document`** into Label Studio predictions for the annotator.
+
+Predictions are emitted as **canonical Label Studio result envelopes** (`type: "rectanglelabels"` / `type: "polygonlabels"`) matching the **HumanSignal Interfaces** Docling annotator at `docling-ls-implementation/docling_interface.jsx`.
 
 Use the **exact service URL** your tenant gives you (Integrate / Python snippet), including the path segment ending in **`/v1`**—for example  
 `https://api.aws-c1.dcls.saas.ibm.com/<instance>/v1`.
@@ -12,7 +14,7 @@ The **`docling`** `DoclingServiceClient` builds paths like **`/v1/convert/...`**
 Typical workflow:
 
 1. Tasks include a **file URL** (PDF, image, etc.)—often an upload or storage URL managed by Label Studio.
-2. Annotators run predictions (or batch predict); this ML backend fetches the file (unless you use remote-URL-only mode), calls **`DoclingServiceClient.convert`**, and returns layout as reactcode regions.
+2. Annotators run predictions (or batch predict); this ML backend fetches the file (unless you use remote-URL-only mode), calls **`DoclingServiceClient.convert`**, and returns the layout as canonical Label Studio regions.
 3. Reviewers adjust regions or labels on top of Docling’s structure.
 
 You need the **full SaaS service URL** and API key from Workbench. Separately, the backend must often **download task files** through Label Studio when URLs point at your instance—see **Label Studio URL and API key** below.
@@ -57,7 +59,15 @@ The ML backend listens on **`http://localhost:9090`**. Register that URL in your
 | `DOCLING_SERVE_TIMEOUT` | No | Job / read timeout in seconds (default `600`). |
 | `DOCLING_HTTP_CONNECT_TIMEOUT` | No | Connect timeout (default `30`). |
 
-Optional tuning: `DOCLING_PAGE_NO`, `DOCLING_PREDICT_READING_ORDER`, `DOCLING_READING_ORDER_LEVEL`, `DOCLING_CONTENT_LAYERS`, `DOCLING_REACTCODE_FROM_NAME`, `DOCLING_REACTCODE_TO_NAME`, `DOCLING_TASK_DATA_KEY`.
+Optional tuning: `DOCLING_PAGE_NO`, `DOCLING_PREDICT_READING_ORDER`, `DOCLING_READING_ORDER_LEVEL`, `DOCLING_INCLUDE_TABLE_STRUCTURE`, `DOCLING_INCLUDE_RELATIONS`, `DOCLING_CONTENT_LAYERS`, `DOCLING_FROM_NAME`, `DOCLING_TO_NAME`, `DOCLING_TASK_DATA_KEY`.
+
+The three shape toggles below default to `true` (opt-out) because that's what makes the prediction render meaningfully in the interface out of the box:
+
+- `DOCLING_PREDICT_READING_ORDER` — emit a `reading_order` polyline per page tracing item centroids in Docling's iteration order. Without one, the DocLang preview pane renders nothing. Set to `false` to skip.
+- `DOCLING_INCLUDE_TABLE_STRUCTURE` — for every `TableItem`, emit one child rectangle per cell (`table_cell` / `column_header` / `row_header` / `row_section` / `table_merged_cell`) with `parentId` set to the enclosing table. Set to `false` to keep tables as a single flat rect.
+- `DOCLING_INCLUDE_RELATIONS` — emit `to_caption` / `to_footnote` / `to_value` linking polylines from `FloatingItem.captions` / `FloatingItem.footnotes` / `KeyValueItem.graph.links[TO_VALUE]`. Without these, captions become detached free-floating text and key/value fields lose their pairing. Set to `false` to skip.
+
+`DOCLING_FROM_NAME` / `DOCLING_TO_NAME` override the `from_name` / `to_name` on emitted predictions (defaults `"docling"` / `"docling"` — matches the interface).
 
 The **`docling`** PyPI package (**≥2.90**) provides **`DoclingServiceClient`**; behavior follows **your SaaS tenant**, not necessarily open-source Docling docs.
 
@@ -68,7 +78,7 @@ The **`docling`** PyPI package (**≥2.90**) provides **`DoclingServiceClient`**
 | `LABEL_STUDIO_URL` | Base URL of Label Studio, reachable from this backend (see above). |
 | `LABEL_STUDIO_API_KEY` | Token so the backend can download task attachments when needed. |
 
-Predictions are **`reactcode`** regions (rectangle / polyline payloads with percent coordinates), aligned with the Label Studio Enterprise ReactCode UI—see **`docling_labeling_config.xml`** in this folder.
+Predictions are emitted in **canonical Label Studio shape** — `type: "rectanglelabels"` for layout regions and `type: "polygonlabels"` for reading-order polylines, with percent coordinates — matching the HumanSignal Interfaces Docling annotator (`docling-ls-implementation/docling_interface.jsx`).
 
 ## Running locally (without Docker)
 
@@ -110,7 +120,7 @@ You should see a line like **`Docling predict: N task(s)`** whenever you run pre
 Common fixes:
 
 1. **Placeholder URL** — Replace **`YOUR_INSTANCE_SEGMENT`** in **`DOCLING_SERVICE_URL`** with the real path from Workbench.
-2. **Wrong task field** — Tasks must expose a **file URL** under the key your labeling config expects (often **`undefined`**). Override with **`DOCLING_TASK_DATA_KEY`** if needed.
+2. **Wrong task field** — Tasks must expose a **file URL** under the key your labeling config expects. The default is **`image`** (matches `docling_interface.jsx`); the backend then falls back through `image`, `url`, `ocr`, `$undefined$`, `$undefined`, `undefined`, `pdf`, `document`, `file`. Override with **`DOCLING_TASK_DATA_KEY`** if needed.
 3. **`LOG_LEVEL`** — Defaults to **`INFO`** in `_wsgi.py` when unset.
 4. **Upload / `/storage-data/` URLs** — `model.py` downloads via **`label_studio_sdk`** using **`LABEL_STUDIO_URL`** (same **scheme + host + port** as in your browser; wrong host breaks auth headers), **`LABEL_STUDIO_API_KEY`**, and network reachability from this container (`host.docker.internal` instead of `localhost` on Docker Desktop). Self-signed HTTPS: set **`VERIFY_SSL=false`** on the ML backend. Logs now include **HTTP status / snippet** when the download fails.
 

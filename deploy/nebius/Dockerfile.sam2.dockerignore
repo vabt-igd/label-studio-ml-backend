@@ -1,0 +1,9 @@
+.git
+**/__pycache__
+**/.pytest_cache
+deploy/nebius/proxy/secrets
+**/*.receipt.*
+**/.env
+# Untracked example files (local overrides, models, caches) must not enter the image.
+label_studio_ml/examples
+!label_studio_ml/examples/segment_anything_2_image/model.py
